@@ -45,12 +45,12 @@ func main() {
    if the address and port was set correctly the client will then connect to the server as intended
 > Note:To simulate a group chat, you can open multiple terminals and run the client code (`client.go`) in each one. All connected clients will be able to send and receive messages in real-time.
    
-3. **input your name:**
+2. **input your name:**
     
    after the connection is established you will be prompted to input your name,
    *for readability avoid large names 4 to 10 letter names are optimal* 
 
-4. **Send Messages:**
+3. **Send Messages:**
 
    type messages in any client's terminal. The message will be broadcasted to all connected clients.
 

@@ -51,9 +51,14 @@ func broadcaster() {
 		fmt.Printf("message sent to users\n")
 		select {
 		case msg := <-Messages:
+			index := strings.Index(msg, "]")
 			uList.Range(func(key, value interface{}) bool {
-				value.(*client).incoming <- msg
-				return true
+				if value.(*client).name == msg[1:index] {
+					return true
+				} else {
+					value.(*client).incoming <- msg
+					return true
+				}
 			})
 
 		}

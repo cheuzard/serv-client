@@ -21,7 +21,7 @@ func main() {
 		conn, _, err := websocket.DefaultDialer.Dial("ws://192.168.1.40:8080", nil)
 		if err != nil {
 			time.Sleep(time.Second * 2)
-			fmt.Println("Error connecting:", err)
+			fmt.Println("Error connecting %v", err)
 		} else if conn != nil {
 			defer func(conn *websocket.Conn) {
 				err := conn.Close()
@@ -35,12 +35,15 @@ func main() {
 			for {
 				reader := bufio.NewReader(os.Stdin)
 				text, _ := reader.ReadString('\n')
-				fmt.Printf("sending....\n")
+				if len(text) < 0 {
+					continue
+				}
 				err := conn.WriteMessage(websocket.TextMessage, []byte(text))
 				if err != nil {
 					fmt.Println("Error connecting:", err)
 					break
 				}
+				fmt.Printf("sending....\n")
 			}
 		}
 

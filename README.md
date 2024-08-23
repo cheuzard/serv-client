@@ -85,7 +85,7 @@ after the connection is established you will be prompted to input your name,
 
    type messages in any client's terminal. The message will be broadcasted to all connected clients.
 
-> Note: due to the limitation of working on terminal when a message is received the text being written will be split by it but when pressing enter the message being sent will still keep it's integrity without loss, *this will be fixed later on*
+> Note: due to the limitation of working on terminal, incoming messages may interrupt and split the text you're typing. However, when you press enter to send the message, it will be sent as a complete and intact message, without losing any content. *this will be fixed later on*
 
 ## License
 

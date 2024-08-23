@@ -3,80 +3,68 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"log"
-	"os"
-	"os/signal"
-	"strings"
-
 	"github.com/gorilla/websocket"
+	"os"
+	"sync"
+	"time"
 )
 
-var done chan interface{}
-var interrupt chan os.Signal
+var (
+	writeMutex sync.Mutex
+)
 
-func receiveHandler(connection *websocket.Conn) {
-	defer close(done)
-	for {
-		_, msg, err := connection.ReadMessage()
+func main() {
+	done := true
+	for i := 1; i < 4 || done; i++ {
+		done = false
+		fmt.Printf("connection try number %v", i)
+		conn, _, err := websocket.DefaultDialer.Dial("ws://192.168.1.40:8080", nil)
 		if err != nil {
-			log.Println("Error in receive:", err)
-			return
+			time.Sleep(time.Second * 2)
+			fmt.Println("Error connecting:", err)
+		} else if conn != nil {
+			defer func(conn *websocket.Conn) {
+				err := conn.Close()
+				if err != nil {
+
+				}
+			}(conn)
+			go Receive(conn)
+			println()
+			done = true
+			for {
+				reader := bufio.NewReader(os.Stdin)
+				text, _ := reader.ReadString('\n')
+				fmt.Printf("sending....\n")
+				err := conn.WriteMessage(websocket.TextMessage, []byte(text))
+				if err != nil {
+					fmt.Println("Error connecting:", err)
+					break
+				}
+			}
 		}
-		fmt.Println(string(msg))
+
 	}
 }
 
-func main() {
-	done = make(chan interface{})    // Channel to indicate that the receiverHandler is done
-	interrupt = make(chan os.Signal) // Channel to listen for interrupt signal to terminate gracefully
-
-	signal.Notify(interrupt, os.Interrupt) // Notify the interrupt channel for SIGINT
-
-	socketUrl := "ws://localhost:8080/ws"
-	conn, _, err := websocket.DefaultDialer.Dial(socketUrl, nil)
-	if err != nil {
-		log.Fatal("Error connecting to Websocket Server:", err)
-	}
-	defer conn.Close()
-
-	go receiveHandler(conn)
-
-	// Our main loop for the client
-	// We send our relevant packets here
-	scanner := bufio.NewScanner(os.Stdin)
+func Receive(conn *websocket.Conn) {
+	writer := bufio.NewWriter(os.Stdout)
 	for {
-		select {
-		case <-interrupt:
-			// We received a SIGINT (Ctrl + C). Terminate gracefully...
-			log.Println("Received SIGINT interrupt signal. Closing all pending connections")
-
-			// Close our websocket connection
-			err := conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-			if err != nil {
-				log.Println("Error during closing websocket:", err)
-				return
-			}
-
-			select {
-			case <-done:
-				log.Println("Receiver Channel Closed! Exiting....")
-			}
+		_, text, err := conn.ReadMessage()
+		println("a message was received")
+		if err != nil {
+			fmt.Printf("error when receiving msg  %v", err)
+		}
+		writeMutex.Lock()
+		_, err = writer.WriteString(string(text) + "\n")
+		if err != nil {
+			writeMutex.Unlock()
 			return
-		default:
-			fmt.Print("Enter message: ")
-			if scanner.Scan() {
-				message := strings.TrimSpace(scanner.Text())
-				if message != "" {
-					err = conn.WriteMessage(websocket.TextMessage, []byte(message))
-					if err != nil {
-						log.Println("Error during message writing:", err)
-						return
-					}
-				}
-			} else {
-				log.Println("Error during message reading:", scanner.Err())
-				return
-			}
+		}
+		err = writer.Flush()
+		writeMutex.Unlock()
+		if err != nil {
+			return
 		}
 	}
 }

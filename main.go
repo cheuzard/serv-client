@@ -20,22 +20,23 @@ type client struct {
 	incoming chan string
 }
 
-var Messages = make(chan string, 10)
+var Messages = make(chan string, 70)
 var uList = sync.Map{}
 
 func main() {
 	port := ":8080" // Load from config or env variable
-	http.HandleFunc("/ws", connection)
+	http.HandleFunc("/", connection)
+	println("handle func set")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
+	go broadcaster()
 	server := &http.Server{Addr: port}
 
 	go func() {
 		<-ctx.Done()
 		err := server.Shutdown(context.Background())
 		if err != nil {
-			return
+			fmt.Printf("error at shutdown  %v", err)
 		}
 	}()
 
@@ -45,19 +46,36 @@ func main() {
 	}
 }
 
+func broadcaster() {
+	for {
+		select {
+		case msg := <-Messages:
+			uList.Range(func(key, value interface{}) bool {
+				value.(*client).incoming <- msg
+				return true
+			})
+
+		}
+	}
+}
+
 func connection(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		fmt.Printf("\n\nconnection failed to start: %v\n", err)
 	}
+	println("connection upgraded")
 	client := &client{
-		name: NameGetter(conn),
-		conn: conn,
+		name:     NameGetter(conn),
+		conn:     conn,
+		incoming: make(chan string, 10),
 	}
+	println("client created")
 	go HandleUser(client)
 }
 
 func HandleUser(client *client) {
+	println("user handler started")
 	uList.Store(client.name, client)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer uList.Delete(client.name)
@@ -69,16 +87,24 @@ func HandleUser(client *client) {
 		}
 	}(client.conn)
 	go Receiver(client, ctx)
-	for receivedMessages := range Messages {
-		err := client.conn.WriteMessage(websocket.TextMessage, []byte(receivedMessages))
-		if err != nil {
-			fmt.Printf("\n\nerror when writing message to websocket: %v", err)
+
+	for {
+		select {
+		case msg := <-client.incoming:
+			err := client.conn.WriteMessage(websocket.TextMessage, []byte(msg))
+			fmt.Printf("message sent to users")
+			if err != nil {
+				fmt.Printf("\n\nerror when writing message to websocket: %v", err)
+				return
+			}
+		case <-ctx.Done():
 			return
 		}
 	}
 }
 
 func Receiver(client *client, ctx context.Context) {
+	println("receiver started")
 	for {
 		_, messageByte, err := client.conn.ReadMessage()
 		fmt.Printf("a message was received: %v", string(messageByte))

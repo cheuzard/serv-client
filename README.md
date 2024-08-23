@@ -24,8 +24,6 @@ This project implements a simple chat server and client in Go, where multiple cl
 ```go
 func main() {
 	port := ":8080"
-	http.HandleFunc("/", connection)
-	println("handle func set")
 ```
 
 2. **Start the Server:**

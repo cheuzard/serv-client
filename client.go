@@ -51,16 +51,21 @@ func Receive(conn *websocket.Conn) {
 	writer := bufio.NewWriter(os.Stdout)
 	for {
 		_, text, err := conn.ReadMessage()
-		println("a message was received")
+		//println("a message was received")
 		if err != nil {
-			fmt.Printf("error when receiving msg  %v", err)
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				fmt.Printf("unexpected close error: %v\n", err)
+			} else {
+				fmt.Printf("error when receiving msg: %v\n", err)
+			}
+			break // Exit the loop on error
 		}
-		writeMutex.Lock()
-		_, err = writer.WriteString(string(text) + "\n")
+
+		_, err = writer.WriteString("\n" + string(text))
 		if err != nil {
-			writeMutex.Unlock()
 			return
 		}
+		writeMutex.Lock()
 		err = writer.Flush()
 		writeMutex.Unlock()
 		if err != nil {

@@ -26,7 +26,7 @@ var uList = sync.Map{}
 func main() {
 	port := ":8080" // Load from config or env variable
 	http.HandleFunc("/", connection)
-	println("handle func set")
+	//println("handle func set")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go broadcaster()
@@ -48,6 +48,7 @@ func main() {
 
 func broadcaster() {
 	for {
+		fmt.Printf("message sent to users\n")
 		select {
 		case msg := <-Messages:
 			uList.Range(func(key, value interface{}) bool {
@@ -70,12 +71,12 @@ func connection(w http.ResponseWriter, r *http.Request) {
 		conn:     conn,
 		incoming: make(chan string, 10),
 	}
-	println("client created")
+	fmt.Printf("client created : %v\n", client.name)
 	go HandleUser(client)
 }
 
 func HandleUser(client *client) {
-	println("user handler started")
+	//println("user handler started")
 	uList.Store(client.name, client)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer uList.Delete(client.name)
@@ -92,7 +93,6 @@ func HandleUser(client *client) {
 		select {
 		case msg := <-client.incoming:
 			err := client.conn.WriteMessage(websocket.TextMessage, []byte(msg))
-			fmt.Printf("message sent to users")
 			if err != nil {
 				fmt.Printf("\n\nerror when writing message to websocket: %v", err)
 				return
@@ -107,7 +107,7 @@ func Receiver(client *client, ctx context.Context) {
 	println("receiver started")
 	for {
 		_, messageByte, err := client.conn.ReadMessage()
-		fmt.Printf("a message was received: %v", string(messageByte))
+		fmt.Printf("a message was received:[%v] %v", client.name, string(messageByte))
 		if err != nil {
 			return
 		}

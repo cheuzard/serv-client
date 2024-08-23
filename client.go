@@ -2,51 +2,91 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"github.com/gorilla/websocket"
 	"os"
+	"os/signal"
+	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
 var (
-	writeMutex sync.Mutex
+	pidChan chan int
+	alive   bool
 )
 
 func main() {
-	done := true
-	for i := 1; i < 4 || done; i++ {
-		done = false
-		fmt.Printf("connection try number %v", i)
-		conn, _, err := websocket.DefaultDialer.Dial("ws://192.168.1.40:8080", nil)
+	alive = true
+	pidChan = make(chan int, 1)
+	group := sync.WaitGroup{}
+	fmt.Printf("trying to connect... ")
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+	conn, _, err := websocket.DefaultDialer.Dial("ws://cheuzard.ddns.net:8080", nil)
+	if err != nil {
+		time.Sleep(time.Second)
+	} else if conn != nil {
+		go clientStarter(conn, ctx, &group)
+		time.Sleep(time.Second)
+		pid := <-pidChan
+		p, err := os.FindProcess(pid)
 		if err != nil {
-			time.Sleep(time.Second * 2)
-			fmt.Println("Error connecting %v", err)
-		} else if conn != nil {
-			defer func(conn *websocket.Conn) {
-				err := conn.Close()
-				if err != nil {
+			return
+		}
+		select {
+		case <-ctx.Done():
+			alive = false
+			err := conn.Close()
+			if err != nil {
+				return
+			}
+			fmt.Printf("\n\nclosing....")
+			err = p.Signal(syscall.SIGTERM)
+			if err != nil {
+				return
+			}
 
-				}
-			}(conn)
-			go Receive(conn)
-			println()
-			done = true
-			for {
-				reader := bufio.NewReader(os.Stdin)
-				text, _ := reader.ReadString('\n')
-				if len(text) < 0 {
+		}
+	}
+}
+
+func clientStarter(conn *websocket.Conn, ctx context.Context, group *sync.WaitGroup) {
+	pidChan <- os.Getpid()
+	group.Add(1)
+	defer group.Done()
+	reader := bufio.NewReader(os.Stdin)
+
+	defer func(conn *websocket.Conn) {
+		err := conn.Close()
+		if err != nil {
+		}
+	}(conn)
+	go Receive(conn)
+	fmt.Println()
+	for {
+		select {
+		case <-ctx.Done():
+			fmt.Println("Context canceled, stopping clientStarter.")
+			return
+		default:
+			text, _ := reader.ReadString('\n')
+			fmt.Printf("\t|----messageSent---->")
+			if alive {
+				text = strings.TrimSpace(text)
+				if len(text) == 0 {
+					fmt.Printf("\b")
 					continue
 				}
 				err := conn.WriteMessage(websocket.TextMessage, []byte(text))
 				if err != nil {
-					fmt.Println("Error connecting:", err)
+					fmt.Println("Error connecting")
 					break
 				}
-				fmt.Printf("sending....\n")
 			}
 		}
-
 	}
 }
 
@@ -54,23 +94,14 @@ func Receive(conn *websocket.Conn) {
 	writer := bufio.NewWriter(os.Stdout)
 	for {
 		_, text, err := conn.ReadMessage()
-		//println("a message was received")
-		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				fmt.Printf("unexpected close error: %v\n", err)
-			} else {
-				fmt.Printf("error when receiving msg: %v\n", err)
-			}
-			break // Exit the loop on error
-		}
-
-		_, err = writer.WriteString("\n" + string(text))
 		if err != nil {
 			return
 		}
-		writeMutex.Lock()
+		_, err = writer.WriteString("\n" + string(text) + "\t|------------------->")
+		if err != nil {
+			continue
+		}
 		err = writer.Flush()
-		writeMutex.Unlock()
 		if err != nil {
 			return
 		}

@@ -6,9 +6,16 @@ import (
 	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
 	"strings"
 	"sync"
+	"syscall"
+	"time"
 )
+
+// set the port here
+var port = ":8080"
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
@@ -24,11 +31,17 @@ var Messages = make(chan string, 70)
 var uList = sync.Map{}
 
 func main() {
-	port := ":8080" // Load from config or env variable
 	http.HandleFunc("/", connection)
 	//println("handle func set")
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	go startServer(ctx)
+	select {
+	case <-ctx.Done():
+		stop()
+		fmt.Printf("shutting down")
+	}
+}
+func startServer(ctx context.Context) {
 	go broadcaster()
 	server := &http.Server{Addr: port}
 
@@ -36,7 +49,7 @@ func main() {
 		<-ctx.Done()
 		err := server.Shutdown(context.Background())
 		if err != nil {
-			fmt.Printf("error at shutdown  %v", err)
+			fmt.Printf("\nerror at shutdown  %v", err)
 		}
 	}()
 
@@ -48,7 +61,7 @@ func main() {
 
 func broadcaster() {
 	for {
-		fmt.Printf("message sent to users\n")
+		fmt.Printf("sending...\n")
 		select {
 		case msg := <-Messages:
 			index := strings.Index(msg, "]")
@@ -99,6 +112,9 @@ func HandleUser(client *client) {
 		case msg := <-client.incoming:
 			err := client.conn.WriteMessage(websocket.TextMessage, []byte(msg))
 			if err != nil {
+				if websocket.IsUnexpectedCloseError(err) {
+					uList.Delete(client.name)
+				}
 				fmt.Printf("\n\nerror when writing message to websocket: %v", err)
 				return
 			}
@@ -112,8 +128,11 @@ func Receiver(client *client, ctx context.Context) {
 	println("receiver started")
 	for {
 		_, messageByte, err := client.conn.ReadMessage()
-		fmt.Printf("a message was received:[%v] %v", client.name, string(messageByte))
+		fmt.Printf("received :[%v] %v\n", client.name, string(messageByte))
 		if err != nil {
+			if websocket.IsUnexpectedCloseError(err) {
+				uList.Delete(client.name)
+			}
 			return
 		}
 		message := string(messageByte)
@@ -123,9 +142,10 @@ func Receiver(client *client, ctx context.Context) {
 			if err != nil {
 				return
 			}
+			return
 		} else {
 			select {
-			case Messages <- fmt.Sprintf("[%s] %s", client.name, message):
+			case Messages <- fmt.Sprintf("[%s]: %s", client.name, message):
 			case <-ctx.Done():
 				return
 			}
@@ -134,6 +154,7 @@ func Receiver(client *client, ctx context.Context) {
 }
 
 func NameGetter(conn *websocket.Conn) string {
+	time.Sleep(time.Millisecond * 100)
 	request := "please only send your name in the next message:\n"
 	err := conn.WriteMessage(websocket.TextMessage, []byte(request))
 	if err != nil {

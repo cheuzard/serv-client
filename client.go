@@ -15,7 +15,7 @@ import (
 
 // set port and url of the server here
 // the url can be an ip addresse
-var ServUrl = "cheuzard.ddns.net"
+var ServUrl = "youUrl.com"
 var ServPort = "8080"
 
 var (

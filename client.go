@@ -13,12 +13,15 @@ import (
 	"time"
 )
 
+// set port and url of the server here
+// the url can be an ip addresse
+var ServUrl = "cheuzard.ddns.net"
+var ServPort = "8080"
+
 var (
 	pidChan chan int
 	alive   bool
 )
-var ServUrl = "cheuzard.ddns.net"
-var ServPort = "8080"
 
 func main() {
 	url := fmt.Sprintf("ws://%v:%v", ServUrl, ServPort)

@@ -13,39 +13,9 @@ This project implements a simple chat server and client in Go, where multiple cl
 - `server.go`: Contains the server-side code.
 - `client.go`: Contains the client-side code.
 
-## Getting Started
-
-### Prerequisites
+## Prerequisites
 
 - **Go:** Ensure that Go is installed on your machine. You can download it from [here](https://golang.org/dl/).
-
-### Running the Server
-
- **Compile and Run the Server:**
-
-   Open a terminal and navigate to the directory containing `server.go`.
-
-   ```bash
-   go run server.go
-   ```
-
-   The server will start and listen for incoming client connections on the specified port (default is `8080`).
-
-### Running the Client
-
-1. **Compile and Run the Client:**
-
-   Open another terminal and navigate to the directory containing `client.go`.
-
-   ```bash
-   go run client.go
-   ```
-
-   The client will prompt you to enter your name and then connect to the server.
-
-### Connecting Multiple Clients
-
-To simulate a group chat, you can open multiple terminals and run the client code (`client.go`) in each one. All connected clients will be able to send and receive messages in real-time.
 
 ## Usage
 ### server side
@@ -76,7 +46,9 @@ func main() {
    ```
 
    if the address and port was set correctly the client will then connect to the server as intended
-2. **input your name:**
+> Note:To simulate a group chat, you can open multiple terminals and run the client code (`client.go`) in each one. All connected clients will be able to send and receive messages in real-time.
+   
+3. **input your name:**
     
    after the connection is established you will be prompted to input your name,
    *for readability avoid large names 4 to 10 letter names are optimal* 

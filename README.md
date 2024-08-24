@@ -20,12 +20,8 @@ This project implements a simple chat server and client in Go, where multiple cl
 ## Usage
 ### server side
 1. **Port Configuration**:
-   By default, the server listens on port `8000`. You can modify the port by editing the server code in `server.go` 
-```go
-	// set the port here
-	    var port = ":8080"
-
-```
+   when starting the server you will be prompted for the port you want to use
+   press enter to use default, the server listens on port `8000`.
 
 2. **Start the Server:**
 
@@ -36,13 +32,8 @@ This project implements a simple chat server and client in Go, where multiple cl
 ### client side
 
 1. **port and Url configuration**
-   you need to set the Url of the server as well as the port that it is listening on
-```go
-    // set port and url of the server here
-    // the url can be an ip addresse
-    var ServUrl = "YourServerUrl.com"
-    var ServPort = "8080"
-```
+
+   when starting the client you will be prompted for address then port of the server you are trying to connect to
 
 2. **Start the Clients:**
 

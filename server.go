@@ -14,9 +14,7 @@ import (
 	"time"
 )
 
-// set the port here
-var port = ":8080"
-
+var port string
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
@@ -31,6 +29,12 @@ var Messages = make(chan string, 70)
 var uList = sync.Map{}
 
 func main() {
+	fmt.Printf("please input the port(press enter to use default :8080):\n")
+	_, err := fmt.Scanf("%v", &port)
+	if err != nil {
+		port = ":8080"
+		fmt.Printf("default port used\n")
+	}
 	http.HandleFunc("/", connection)
 	//println("handle func set")
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

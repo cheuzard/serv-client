@@ -13,17 +13,26 @@ import (
 	"time"
 )
 
-// set port and url of the server here
-// the url can be an ip addresse
-var ServUrl = "192.168.1.40"
-var ServPort = "8080"
-
+var ServPort string
+var ServUrl string
 var (
 	pidChan chan int
 	alive   bool
 )
 
 func main() {
+
+	fmt.Printf("please input the server addresse:\n")
+	_, err := fmt.Scanf("%v", &ServUrl)
+	if err != nil {
+		fmt.Printf("error in addresse: %v", err)
+		return
+	}
+	fmt.Printf("please input the port:\n")
+	_, err = fmt.Scanf("%v", &ServPort)
+	if err != nil {
+		fmt.Printf("error in port %v", err)
+	}
 	url := fmt.Sprintf("ws://%v:%v", ServUrl, ServPort)
 	alive = true
 	pidChan = make(chan int, 1)
@@ -60,6 +69,9 @@ func main() {
 		}
 	}
 }
+
+// set port and url of the server here
+// the url can be an ip addresse
 
 func clientStarter(conn *websocket.Conn, ctx context.Context, group *sync.WaitGroup) {
 	pidChan <- os.Getpid()

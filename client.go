@@ -28,11 +28,13 @@ func main() {
 		fmt.Printf("error in addresse: %v", err)
 		return
 	}
-	fmt.Printf("please input the port:\n")
+	fmt.Printf("please input the port(press enter for default :8080):\n")
 	_, err = fmt.Scanf("%v", &ServPort)
 	if err != nil {
-		fmt.Printf("error in port %v", err)
+		fmt.Printf("dafault port slected")
 	}
+	ServUrl = strings.TrimSpace(ServUrl)
+	ServPort = strings.TrimSpace(ServPort)
 	url := fmt.Sprintf("ws://%v:%v", ServUrl, ServPort)
 	alive = true
 	pidChan = make(chan int, 1)
@@ -46,7 +48,6 @@ func main() {
 			time.Sleep(time.Second)
 		} else if conn != nil {
 			go clientStarter(conn, ctx, &group)
-			time.Sleep(time.Second)
 			pid := <-pidChan
 			p, err := os.FindProcess(pid)
 			if err != nil {
@@ -69,9 +70,6 @@ func main() {
 		}
 	}
 }
-
-// set port and url of the server here
-// the url can be an ip addresse
 
 func clientStarter(conn *websocket.Conn, ctx context.Context, group *sync.WaitGroup) {
 	pidChan <- os.Getpid()

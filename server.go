@@ -52,7 +52,7 @@ func startServer(ctx context.Context) {
 			fmt.Printf("\nerror at shutdown  %v", err)
 		}
 	}()
-
+	fmt.Printf("listening on port:%v\n", port)
 	err := server.ListenAndServe()
 	if err != nil {
 		log.Fatal(err)
@@ -61,9 +61,9 @@ func startServer(ctx context.Context) {
 
 func broadcaster() {
 	for {
-		fmt.Printf("sending...\n")
 		select {
 		case msg := <-Messages:
+			fmt.Printf("sending...\n")
 			index := strings.Index(msg, "]")
 			uList.Range(func(key, value interface{}) bool {
 				if value.(*client).name == msg[1:index] {

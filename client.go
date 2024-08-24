@@ -15,7 +15,7 @@ import (
 
 // set port and url of the server here
 // the url can be an ip addresse
-var ServUrl = "youUrl.com"
+var ServUrl = "192.168.1.40"
 var ServPort = "8080"
 
 var (
@@ -29,32 +29,34 @@ func main() {
 	pidChan = make(chan int, 1)
 	group := sync.WaitGroup{}
 	fmt.Printf("trying to connect... ")
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer stop()
-	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
-	if err != nil {
-		time.Sleep(time.Second)
-	} else if conn != nil {
-		go clientStarter(conn, ctx, &group)
-		time.Sleep(time.Second)
-		pid := <-pidChan
-		p, err := os.FindProcess(pid)
+	for {
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+		defer stop()
+		conn, _, err := websocket.DefaultDialer.Dial(url, nil)
 		if err != nil {
-			return
-		}
-		select {
-		case <-ctx.Done():
-			alive = false
-			err := conn.Close()
+			time.Sleep(time.Second)
+		} else if conn != nil {
+			go clientStarter(conn, ctx, &group)
+			time.Sleep(time.Second)
+			pid := <-pidChan
+			p, err := os.FindProcess(pid)
 			if err != nil {
 				return
 			}
-			fmt.Printf("\n\nclosing....")
-			err = p.Signal(syscall.SIGTERM)
-			if err != nil {
-				return
-			}
+			select {
+			case <-ctx.Done():
+				alive = false
+				err := conn.Close()
+				if err != nil {
+					return
+				}
+				fmt.Printf("\n\nclosing....")
+				err = p.Signal(syscall.SIGTERM)
+				if err != nil {
+					return
+				}
 
+			}
 		}
 	}
 }

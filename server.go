@@ -16,7 +16,9 @@ import (
 
 var port string
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
+	CheckOrigin: func(r *http.Request) bool {
+		return true // Allow all origins
+	},
 }
 
 type client struct {
@@ -32,7 +34,7 @@ func main() {
 	fmt.Printf("please input the port(press enter to use default :8080):\n")
 	_, err := fmt.Scanf("%v", &port)
 	if err != nil {
-		port = ":8080"
+		port = "8080"
 		fmt.Printf("default port used\n")
 	}
 	http.HandleFunc("/", connection)
@@ -46,14 +48,16 @@ func main() {
 	}
 }
 func startServer(ctx context.Context) {
+	finalPort := fmt.Sprintf(":%v", port)
 	go broadcaster()
-	server := &http.Server{Addr: port}
+	server := &http.Server{Addr: finalPort}
 
 	go func() {
 		<-ctx.Done()
 		err := server.Shutdown(context.Background())
 		if err != nil {
 			fmt.Printf("\nerror at shutdown  %v", err)
+			return
 		}
 	}()
 	fmt.Printf("listening on port:%v\n", port)
@@ -61,9 +65,11 @@ func startServer(ctx context.Context) {
 	if err != nil {
 		log.Fatal(err)
 	}
+	fmt.Printf("server dead")
 }
 
 func broadcaster() {
+	fmt.Printf("broadcaster is up")
 	for {
 		select {
 		case msg := <-Messages:
@@ -83,9 +89,12 @@ func broadcaster() {
 }
 
 func connection(w http.ResponseWriter, r *http.Request) {
+	origin := r.Header.Get("Origin")
+	fmt.Printf("connection started%v\n", origin)
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		fmt.Printf("\n\nconnection failed to start: %v\n", err)
+		return
 	}
 	println("connection upgraded")
 	client := &client{
@@ -107,6 +116,7 @@ func HandleUser(client *client) {
 		err := conn.Close()
 		if err != nil {
 			fmt.Printf("\n\nconnection failed to close: %v", err)
+			return
 		}
 	}(client.conn)
 	go Receiver(client, ctx)
@@ -159,14 +169,41 @@ func Receiver(client *client, ctx context.Context) {
 
 func NameGetter(conn *websocket.Conn) string {
 	time.Sleep(time.Millisecond * 100)
-	request := "please only send your name in the next message:\n"
-	err := conn.WriteMessage(websocket.TextMessage, []byte(request))
-	if err != nil {
-		return ""
+	for {
+		exists := false
+		request := "please input your name (between 3 and 10 characters):\n"
+		err := conn.WriteMessage(websocket.TextMessage, []byte(request))
+		if err != nil {
+			return ""
+		}
+		_, answer, err := conn.ReadMessage()
+		if err != nil {
+			fmt.Printf("failed getting name")
+			return ""
+		}
+		name := strings.TrimSpace(string(answer))
+		if len(name) > 3 && len(name) < 11 {
+			uList.Range(func(key, value interface{}) bool {
+				if key == name {
+					exists = true
+					return false
+				}
+				return true
+			})
+			if !exists {
+				return name
+			}
+		} else {
+			err = conn.WriteMessage(websocket.TextMessage, []byte("\n\t!!!name too small or too long!!!\n"))
+			if err != nil {
+				return ""
+			}
+		}
+		if exists {
+			err = conn.WriteMessage(websocket.TextMessage, []byte("\n\t!!!name already exists!!!\n"))
+			if err != nil {
+				return ""
+			}
+		}
 	}
-	_, answer, err := conn.ReadMessage()
-	if err != nil {
-	}
-	name := strings.TrimSpace(string(answer))
-	return name
 }

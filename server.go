@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/gorilla/websocket"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -17,7 +18,12 @@ import (
 var port string
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		return true // Allow all origins
+		ip, _, err := net.SplitHostPort(r.RemoteAddr)
+		if err != nil {
+			fmt.Printf("error in spliting port %v", err)
+		}
+		cheu, _ := net.LookupHost("cheuzard.ddns.net")
+		return ip == cheu[0]
 	},
 }
 
@@ -76,7 +82,7 @@ func broadcaster() {
 			fmt.Printf("sending...\n")
 			index := strings.Index(msg, "]")
 			uList.Range(func(key, value interface{}) bool {
-				if value.(*client).name == msg[1:index] {
+				if index != -1 && value.(*client).name == msg[1:index] {
 					return true
 				} else {
 					value.(*client).incoming <- msg
@@ -103,6 +109,8 @@ func connection(w http.ResponseWriter, r *http.Request) {
 		incoming: make(chan string, 10),
 	}
 	fmt.Printf("client created : %v\n", client.name)
+	Messages <- fmt.Sprintf("  >%v just joined", client.name)
+	fmt.Printf("  >%v just joined", client.name)
 	go HandleUser(client)
 }
 
@@ -115,11 +123,10 @@ func HandleUser(client *client) {
 	defer func(conn *websocket.Conn) {
 		err := conn.Close()
 		if err != nil {
-			fmt.Printf("\n\nconnection failed to close: %v", err)
 			return
 		}
 	}(client.conn)
-	go Receiver(client, ctx)
+	go Receiver(client, ctx, cancel)
 
 	for {
 		select {
@@ -129,29 +136,37 @@ func HandleUser(client *client) {
 				if websocket.IsUnexpectedCloseError(err) {
 					uList.Delete(client.name)
 				}
-				fmt.Printf("\n\nerror when writing message to websocket: %v", err)
 				return
 			}
 		case <-ctx.Done():
+			fmt.Printf("terminating user\n")
 			return
 		}
 	}
 }
 
-func Receiver(client *client, ctx context.Context) {
+func Receiver(client *client, ctx context.Context, cancel context.CancelFunc) {
 	println("receiver started")
 	for {
 		_, messageByte, err := client.conn.ReadMessage()
 		fmt.Printf("received :[%v] %v\n", client.name, string(messageByte))
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err) {
+				Messages <- fmt.Sprintf("  >%v just left", client.name)
+				fmt.Printf("  >%v just left", client.name)
+				close(client.incoming)
 				uList.Delete(client.name)
+				cancel()
 			}
 			return
 		}
 		message := string(messageByte)
 		if len(message) > 0 && message == "/exit" {
+			Messages <- fmt.Sprintf("  >%v just left", client.name)
+			fmt.Printf("  >%v just left", client.name)
+			close(client.incoming)
 			uList.Delete(client.name)
+			cancel()
 			err := client.conn.Close()
 			if err != nil {
 				return

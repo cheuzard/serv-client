@@ -51,7 +51,7 @@ func main() {
 				fmt.Printf("%v", err)
 				time.Sleep(time.Second)
 			} else if conn != nil {
-				go clientStarter(conn, ctx)
+				go clientStarter(conn, ctx, stop)
 				pid := <-pidChan
 				p, err := os.FindProcess(pid)
 				if err != nil {
@@ -76,7 +76,7 @@ func main() {
 	}
 }
 
-func clientStarter(conn *websocket.Conn, ctx context.Context) {
+func clientStarter(conn *websocket.Conn, ctx context.Context, stop context.CancelFunc) {
 	pidChan <- os.Getpid()
 
 	reader := bufio.NewReader(os.Stdin)
@@ -86,12 +86,13 @@ func clientStarter(conn *websocket.Conn, ctx context.Context) {
 		if err != nil {
 		}
 	}(conn)
-	go Receive(conn)
+	go Receive(conn, stop)
 	fmt.Println()
 	for {
 		select {
 		case <-ctx.Done():
 			fmt.Println("Context canceled, stopping clientStarter.")
+
 			return
 		default:
 			text, _ := reader.ReadString('\n')
@@ -111,11 +112,13 @@ func clientStarter(conn *websocket.Conn, ctx context.Context) {
 	}
 }
 
-func Receive(conn *websocket.Conn) {
+func Receive(conn *websocket.Conn, stop context.CancelFunc) {
 	writer := bufio.NewWriter(os.Stdout)
 	for {
 		_, text, err := conn.ReadMessage()
 		if err != nil {
+			fmt.Printf("connection terminated shutting down")
+			stop()
 			return
 		}
 		_, err = writer.WriteString("\n" + string(text) + "\t|------------------->")

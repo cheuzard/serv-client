@@ -119,7 +119,9 @@ func HandleUser(client *client) {
 	defer func() {
 		uList.Delete(client.name)
 		cancel()
-		client.conn.Close()
+		if err := client.conn.Close(); err != nil {
+			return
+		}
 	}()
 	go Receiver(client, ctx, cancel)
 

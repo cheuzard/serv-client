@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/gorilla/websocket"
+	"log"
 	"os"
 	"os/signal"
 	"strings"
@@ -12,64 +13,60 @@ import (
 	"time"
 )
 
-var ServPort string
-var ServUrl string
 var (
 	pidChan chan int
 	alive   bool
 )
 
 func main() {
+	fmt.Println("Please input the server address:")
+	var ServUrl string
+	if _, err := fmt.Scanln(&ServUrl); err != nil {
+		log.Print("error getting Url")
+	}
 
-	fmt.Printf("please input the server addresse:\n")
-	_, err := fmt.Scanf("%v", &ServUrl)
-	if err != nil {
-		fmt.Printf("error in addresse: %v", err)
-		return
-	}
-	fmt.Printf("please input the port(press enter for default :8080):\n")
-	_, err = fmt.Scanf("%v", &ServPort)
-	if err != nil {
+	fmt.Println("Please input the port (press enter for default: 8080):")
+	var ServPort string
+	if _, err := fmt.Scanln(&ServPort); err != nil {
 		ServPort = "8080"
-		fmt.Printf("dafault port slected\n")
+		fmt.Println("Default port selected")
 	}
+
 	ServUrl = strings.TrimSpace(ServUrl)
 	ServPort = strings.TrimSpace(ServPort)
 	url := fmt.Sprintf("ws://%v:%v", ServUrl, ServPort)
-	alive = true
-	pidChan = make(chan int, 1)
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			fmt.Printf("trying to connect... \n")
+			fmt.Println("Trying to connect...")
 			conn, _, err := websocket.DefaultDialer.Dial(url, nil)
 			if err != nil {
-				fmt.Printf("%v", err)
+				fmt.Println(err)
 				time.Sleep(time.Second)
-			} else if conn != nil {
+			} else {
 				go clientStarter(conn, ctx, stop)
 				pid := <-pidChan
 				p, err := os.FindProcess(pid)
 				if err != nil {
 					return
 				}
+
 				select {
 				case <-ctx.Done():
 					alive = false
-					err := conn.Close()
-					if err != nil {
+					if err := conn.Close(); err != nil {
 						return
 					}
-					fmt.Printf("\n\nclosing....")
-					err = p.Signal(syscall.SIGTERM)
-					if err != nil {
+					fmt.Println("\nClosing...")
+					if err := p.Signal(syscall.SIGTERM); err != nil {
 						return
 					}
-
 				}
 			}
 		}
